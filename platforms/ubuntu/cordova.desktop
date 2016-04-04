@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Dilma Dilma
+Exec=./cordova-ubuntu www/
+Terminal=false
+Type=Application
+X-Ubuntu-Touch=true
+Icon=qmlscene
