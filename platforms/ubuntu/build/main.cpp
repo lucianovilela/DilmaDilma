@@ -1,5 +1,5 @@
 /*
- *  Copyright 2013 Canonical Ltd.
+ *  Copyright 2013-2016 Canonical Ltd.
  *  Copyright 2011 Wolfgang Koller - http://www.gofg.at/
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,11 +18,18 @@
 #include <QtCore>
 #include <QApplication>
 #include <QtQuick>
+#include <QtNetwork/QNetworkInterface>
 
-static void customMessageOutput(QtMsgType type, const QMessageLogContext &, const QString &msg) {
+const int kDebuggingDevtoolsDefaultPort = 9222;
+
+void customMessageOutput(
+        QtMsgType type,
+        const QMessageLogContext &,
+        const QString &msg) {
+
     switch (type) {
     case QtDebugMsg:
-        if (qgetenv("DEBUG").size()) {
+        if (QString::fromUtf8(qgetenv("DEBUG")) == "1") {
             fprintf(stderr, "Debug: %s\n", msg.toStdString().c_str());
         }
         break;
@@ -35,14 +42,30 @@ static void customMessageOutput(QtMsgType type, const QMessageLogContext &, cons
     case QtFatalMsg:
         fprintf(stderr, "Fatal: %s\n", msg.toStdString().c_str());
         abort();
+        break;
     }
 }
 
+QString getDebuggingDevtoolsIp()
+{
+    QString host;
+    Q_FOREACH(QHostAddress address, QNetworkInterface::allAddresses()) {
+        if (!address.isLoopback() && (address.protocol() == QAbstractSocket::IPv4Protocol)) {
+            host = address.toString();
+            break;
+        }
+    }
+    return host;
+}
+
 int main(int argc, char *argv[]) {
-    printf("\nApache Cordova native platform version %s is starting\n\n", CORDOVA_UBUNTU_VERSION);
+    printf("\nApache Cordova native platform version %s is starting\n\n"
+           , CORDOVA_UBUNTU_VERSION);
+
     fflush(stdout);
 
     qInstallMessageHandler(customMessageOutput);
+
     QApplication app(argc, argv);
 
     //TODO: switch to options parser
@@ -60,7 +83,39 @@ int main(int argc, char *argv[]) {
     QQmlApplicationEngine view;
 
     QDir workingDir = QApplication::applicationDirPath();
-    view.rootContext()->setContextProperty("www", wwwDir.absolutePath());
+
+    bool debuggingEnabled =
+            (qEnvironmentVariableIsSet("DEBUG")
+             && QString(qgetenv("DEBUG")) == "1");
+
+    // TODO revamp this for something cleaner, uniform
+    // and runtime bound
+#if !defined(NDEBUG)
+    debuggingEnabled = true;
+#endif
+
+    view.rootContext()->setContextProperty(
+                "debuggingEnabled", debuggingEnabled);
+
+    QString debuggingDevtoolsIp;
+    int debuggingDevtoolsPort = -1;
+
+    if (debuggingEnabled) {
+      debuggingDevtoolsIp = getDebuggingDevtoolsIp();
+      debuggingDevtoolsPort = kDebuggingDevtoolsDefaultPort;
+
+      qDebug() << QString("Devtools URL: http://%1:%2")
+        .arg(debuggingDevtoolsIp)
+        .arg(debuggingDevtoolsPort);
+    }
+
+    view.rootContext()->setContextProperty(
+                "debuggingDevtoolsIp", debuggingDevtoolsIp);
+    view.rootContext()->setContextProperty(
+                "debuggingDevtoolsPort", debuggingDevtoolsPort);
+
+    view.rootContext()->setContextProperty(
+                "www", wwwDir.absolutePath());
 
     view.load(QUrl(QString("%1/qml/main.qml").arg(workingDir.absolutePath())));
 

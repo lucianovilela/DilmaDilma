@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2013 Canonical Ltd.
+ * Copyright 2013-2016 Canonical Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,12 @@
  *
 */
 import QtQuick 2.0
-import com.canonical.Oxide 1.0
+import com.canonical.Oxide 1.9
 import "cordova_wrapper.js" as CordovaWrapper
-import Ubuntu.Components 0.1
-import Ubuntu.Components.Popups 0.1
+import Ubuntu.Components 1.0
+import Ubuntu.Components.Popups 1.0
 
-Item {
+OrientationHelper {
     id: root
 
     anchors.fill: parent
@@ -57,6 +57,10 @@ Item {
                     request.action = NavigationRequest.ActionReject;
             }
 
+            popupMenu: ItemSelector {
+                automaticOrientation: false
+            }
+
             preferences.remoteFontsEnabled: true
             preferences.javascriptCanAccessClipboard: true
             preferences.canDisplayInsecureContent: true
@@ -78,11 +82,27 @@ Item {
                 request.accept();
             }
 
+            onJavaScriptConsoleMessage: {
+                var msg = "[JS] (%1:%2) %3".arg(sourceId).arg(lineNumber).arg(message)
+                if (level === WebView.LogSeverityVerbose) {
+                    console.log(msg)
+                } else if (level === WebView.LogSeverityInfo) {
+                    console.info(msg)
+                } else if (level === WebView.LogSeverityWarning) {
+                    console.warn(msg)
+                } else if ((level === WebView.LogSeverityError) ||
+                           (level === WebView.LogSeverityErrorReport) ||
+                           (level === WebView.LogSeverityFatal)) {
+                    console.error(msg)
+                }
+            }
+
             context: WebContext {
                 id: webcontext
 
-                devtoolsEnabled: true
-                devtoolsPort: 9222
+                devtoolsEnabled: debuggingEnabled
+                devtoolsIp: debuggingDevtoolsIp
+                devtoolsPort: debuggingEnabled ? debuggingDevtoolsPort : -1
 
                 userScripts: [
                     UserScript {
@@ -109,8 +129,8 @@ Item {
                     msgId: "from-cordova"
                     contexts: [usContext]
                     callback: function(msg, frame) {
-                        CordovaWrapper.messageHandler(msg.args)
-                        console.log(JSON.stringify(msg.args))
+                        CordovaWrapper.messageHandler(msg.payload)
+                        console.log('Message payload', JSON.stringify(msg.payload))
                     }
                 }
             ]
@@ -125,7 +145,7 @@ Item {
                 cordova.setTitle(webView.title)
             }
 
-            onLoadingChanged: {
+            onLoadingStateChanged: {
                 if (!webView.loading) {
                     root.completed()
                     cordova.loadFinished(true)

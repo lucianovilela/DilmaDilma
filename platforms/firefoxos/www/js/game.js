@@ -140,5 +140,9 @@ window.onload = function() {
         status = 'INICIAL';
     });
 
+    $("#game").click(function () {
 
+        console.log("status inicial");
+        status = 'INICIAL';
+    });
 }

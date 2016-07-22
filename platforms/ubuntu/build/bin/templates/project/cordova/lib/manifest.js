@@ -21,6 +21,7 @@ var ConfigParser = require('./config_parser');
 var path         = require('path');
 var fs           = require('fs');
 var logger       = require('./logger');
+var Utils        = require('./utils');
 
 function sanitize(str) {
     return str.replace(/\n/g, ' ').replace(/^\s+|\s+$/g, '');
@@ -30,6 +31,12 @@ module.exports = {
     generate: function(path, outDir) {
         var config = new ConfigParser(path);
 
+
+        if (!config.author()) {
+            logger.error("\nconfig.xml should contain author");
+            process.exit(1);
+        }
+
         this.generateDesktopFile(config, outDir);
         this.generateManifest(config, outDir);
         this.generateApparmorProfile(config, outDir);
@@ -38,23 +45,32 @@ module.exports = {
     generateDesktopFile: function(config, dir) {
         var name = sanitize(config.name()); //FIXME: escaping
         var content = '[Desktop Entry]\nName=' + name + '\nExec=./cordova-ubuntu www/\nTerminal=false\nType=Application\nX-Ubuntu-Touch=true';
+        if (config.icon() && fs.existsSync(path.join(dir, '../..', config.icon()))) {
+            Utils.cp(path.join(dir, '../..', config.icon()), path.join(dir, 'www'));
 
-        if (config.icon() && fs.existsSync(path.join(dir, 'www', config.icon()))) {
-            content += '\nIcon=www/' + config.icon();
+            content += '\nIcon=www/' + path.basename(config.icon());
         } else {
-            logger.error("Missing icon");
-            process.exit(1);
+            Utils.cp(path.join(dir, 'build', 'default_icon.png'), path.join(dir, 'www'));
+
+            content += '\nIcon=www/default_icon.png';
         }
 
         fs.writeFileSync(path.join(dir, 'cordova.desktop'), content);
     },
 
     generateManifest: function(config, dir) {
+        var hooks = { cordova: { desktop: 'cordova.desktop',
+                                 apparmor: 'apparmor.json' } };
+
+        config.etree.getroot().findall('./feature/param').forEach(function (element) {
+            if (element.attrib.hook)
+                hooks.cordova[element.attrib.hook] = element.attrib.value;
+        });
+
         var manifest = { name: config.id(),
                          version: config.version(),
                          title: config.name(),
-                         hooks: { cordova: { desktop: 'cordova.desktop',
-                                             apparmor: 'apparmor.json' } },
+                         hooks: hooks,
                          maintainer: sanitize(config.author())  + ' <' + config.email() + '>',
                          description: sanitize(config.description()) };
 

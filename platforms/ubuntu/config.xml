@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <widget id="br.com.vilela.dilmadilma" version="0.0.1" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
-    <preference name="loglevel" value="DEBUG" />
+    <icon src="www/img/logo.png" />
     <name>Dilma Dilma</name>
     <description>Uma bricadeira com a lenda Charlie Charlie</description>
     <author email="dev@cordova.apache.org" href="http://cordova.io">
@@ -8,4 +8,5 @@
     </author>
     <content src="index.html" />
     <access origin="*" />
+    <preference name="loglevel" value="DEBUG" />
 </widget>
